@@ -5,7 +5,6 @@ match a user's dietary preferences and goals.
 """
 
 from typing import List, Dict, Optional
-import math
 import random
 import json
 from core.logger import get_logger
@@ -271,6 +270,94 @@ class RecommendationEngine:
         plan['date'] = __import__('datetime').date.today().isoformat()
         logger.info("Generated plan for user %s: calories=%s", getattr(user_profile, 'id', None), daily_totals['calories'])
         return plan
+
+    def generate_weekly_meal_plan(self, user_profile, all_meals) -> List[Dict]:
+        """Generate a 7-day weekly meal plan with variety.
+
+        Ensures meal variety by tracking used meals and avoiding repetition
+        across the week.
+
+        Args:
+            user_profile: ORM User object containing target calories/macros.
+            all_meals: Iterable of Meal objects available for selection.
+
+        Returns:
+            List of 7 daily meal plan dictionaries.
+        """
+        from datetime import date, timedelta
+        
+        target_calories = user_profile.target_calories
+        per = {'breakfast': 0.25, 'lunch': 0.35, 'dinner': 0.35, 'snack': 0.05}
+        total_macros = {'protein': user_profile.target_protein, 'carbs': user_profile.target_carbs, 'fat': user_profile.target_fat}
+
+        allergies = []
+        try:
+            allergies = json.loads(user_profile.allergies) if user_profile.allergies else []
+        except Exception:
+            allergies = []
+        pool = self.filter_meals_by_preference(all_meals, user_profile.dietary_preference, allergies)
+
+        weekly_plan = []
+        used_meals = {'breakfast': set(), 'lunch': set(), 'dinner': set(), 'snack': set()}
+        
+        start_date = date.today()
+        
+        for day_offset in range(7):
+            plan_date = start_date + timedelta(days=day_offset)
+            day_plan = {}
+            daily_totals = {'calories': 0, 'protein': 0, 'carbs': 0, 'fat': 0}
+            
+            for mtype in ['breakfast', 'lunch', 'dinner', 'snack']:
+                target_c = target_calories * per[mtype]
+                target_mac = {k: total_macros[k] * per[mtype] for k in total_macros}
+                
+                # Filter out already used meals for variety
+                available = [m for m in pool if m.meal_type == mtype and getattr(m, 'id', None) not in used_meals[mtype]]
+                
+                if not available:
+                    # If all meals used, reset for this meal type
+                    used_meals[mtype].clear()
+                    available = [m for m in pool if m.meal_type == mtype]
+                
+                if not available:
+                    # Fallback to any meal of this type
+                    available = [m for m in all_meals if getattr(m, 'meal_type', None) == mtype]
+                
+                if not available:
+                    continue
+                
+                # Score and select best meal
+                scored = [(self.score_meal(m, target_c, target_mac), m) for m in available]
+                scored.sort(key=lambda x: x[0], reverse=True)
+                sel = scored[0][1]
+                
+                # Mark as used
+                meal_id = getattr(sel, 'id', None)
+                if meal_id:
+                    used_meals[mtype].add(meal_id)
+                
+                day_plan[mtype] = {
+                    'id': meal_id,
+                    'name': getattr(sel, 'name', None),
+                    'meal_type': getattr(sel, 'meal_type', None),
+                    'calories': getattr(sel, 'calories', 0),
+                    'protein': getattr(sel, 'protein', 0),
+                    'carbs': getattr(sel, 'carbs', 0),
+                    'fat': getattr(sel, 'fat', 0),
+                    'ingredients': json.loads(sel.ingredients) if hasattr(sel, 'ingredients') and sel.ingredients else []
+                }
+                daily_totals['calories'] += getattr(sel, 'calories', 0)
+                daily_totals['protein'] += getattr(sel, 'protein', 0)
+                daily_totals['carbs'] += getattr(sel, 'carbs', 0)
+                daily_totals['fat'] += getattr(sel, 'fat', 0)
+            
+            day_plan['daily_totals'] = daily_totals
+            day_plan['date'] = plan_date.isoformat()
+            day_plan['day_of_week'] = plan_date.strftime('%A')
+            weekly_plan.append(day_plan)
+        
+        logger.info("Generated weekly plan for user %s: %s days", getattr(user_profile, 'id', None), len(weekly_plan))
+        return weekly_plan
 
 
 # export a default instance

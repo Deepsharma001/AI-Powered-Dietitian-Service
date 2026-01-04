@@ -1,6 +1,6 @@
 """Endpoints for training and predicting diet recommendations."""
 from fastapi import APIRouter, HTTPException, Body, Depends
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 import json
 from services.diet_trainer import train_from_csv, predict_from_profile, load_model
@@ -46,11 +46,13 @@ class PredictRequest(BaseModel):
         profile: Optional inline profile dictionary with user attributes.
         use_csv: If True, source meals from CSV fixtures instead of DB.
         preference: Explicit dietary preference (e.g., 'veg', 'vegan', 'keto').
+        weekly: If True, generate 7-day weekly plan instead of single day.
     """
     user_id: Optional[int] = None
     profile: Optional[Dict[str, Any]] = None
     use_csv: Optional[bool] = False  # if true, source meals from CSV fixtures instead of DB
     preference: Optional[str] = None  # explicit dietary preference (veg, vegan, keto, etc.)
+    weekly: Optional[bool] = False  # if true, generate weekly plan instead of daily
 
 
 class PredictResponse(BaseModel):
@@ -74,6 +76,7 @@ class PredictResponse(BaseModel):
         probabilities: Dictionary mapping each class to its probability.
         recommended_meals: List of recommended meal objects.
         daily_plan: Generated daily meal plan with breakfast, lunch, dinner.
+        weekly_plan: Optional 7-day weekly meal plan.
     """
     user_id: Optional[int] = None
     name: Optional[str] = None
@@ -92,6 +95,7 @@ class PredictResponse(BaseModel):
     probabilities: Dict[str, float]
     recommended_meals: Optional[list] = None
     daily_plan: Optional[dict] = None
+    weekly_plan: Optional[List[dict]] = None
 
 
 @router.post("/train", response_model=TrainResponse)
@@ -323,8 +327,9 @@ def predict(request: PredictRequest = Body(...), db=Depends(get_db_read)):
                 # skip any problematic rows but continue
                 continue
 
-        # optionally generate a daily plan tailored to user/profile
+        # optionally generate a daily or weekly plan tailored to user/profile
         daily_plan = None
+        weekly_plan = None
         try:
             # assemble a temporary profile with targets if possible
             from types import SimpleNamespace
@@ -343,11 +348,18 @@ def predict(request: PredictRequest = Body(...), db=Depends(get_db_read)):
                     user_obj = SimpleNamespace(target_calories=target_cals, target_protein=macros['protein'], target_carbs=macros['carbs'], target_fat=macros['fat'], dietary_preference=diet_label, allergies=json.dumps(profile.get('Allergies') or []))
             if user_obj is not None:
                 # Use same meal source (CSV or DB) as recommended_meals
-                plan = recommendation_service.generate_daily_meal_plan(user_obj, all_meals)
-                daily_plan = plan
+                is_weekly = getattr(request, 'weekly', False)
+                if is_weekly:
+                    # Generate weekly plan
+                    weekly_plan = recommendation_service.generate_weekly_meal_plan(user_obj, all_meals)
+                else:
+                    # Generate daily plan
+                    plan = recommendation_service.generate_daily_meal_plan(user_obj, all_meals)
+                    daily_plan = plan
         except Exception as exc:
-            logger.exception("Failed to generate daily_plan: %s", exc)
+            logger.exception("Failed to generate meal plan: %s", exc)
             daily_plan = None
+            weekly_plan = None
 
         # Build comprehensive response with user profile info
         from services.nutrition_calculator import nutrition_calculator
@@ -408,7 +420,9 @@ def predict(request: PredictRequest = Body(...), db=Depends(get_db_read)):
             }
 
         out['recommended_meals'] = recommended_meals
-        out['daily_plan'] = daily_plan
+        is_weekly = getattr(request, 'weekly', False)
+        out['daily_plan'] = daily_plan if not is_weekly else None
+        out['weekly_plan'] = weekly_plan if is_weekly else None
         out.update(user_data)
         return PredictResponse(**out)
     except ModelNotTrainedError:

@@ -16,6 +16,7 @@ class UserCreateRequest(BaseModel):
     dietary_preference: str = Field(..., examples=["balanced"], description="Dietary preference: balanced, keto, vegetarian, vegan, paleo, mediterranean, high-protein")
     health_goal: str = Field(..., examples=["maintain"], description="Health goal: weight_loss, muscle_gain, maintain")
     allergies: Optional[List[str]] = Field(default=[], examples=[["peanuts", "shellfish"]], description="List of food allergies")
+    use_csv: Optional[bool] = Field(default=False, examples=[False], description="If true, source meals from CSV fixtures instead of database")
 
 
 class UserWithMealPlanResponse(BaseModel):
@@ -32,5 +33,24 @@ class UserWithMealPlanResponse(BaseModel):
     dietary_preference: str
     target_calories: float
     target_macros: dict
-    meal_plan: dict
+    daily_plan: dict
+    weekly_plan: List[dict]
+    created_at: str
+
+
+class WeeklyMealPlanResponse(BaseModel):
+    """Response containing a 7-day weekly meal plan."""
+
+    name: str
+    age: int
+    height: float
+    weight: float
+    bmi: float
+    gender: str
+    activity_level: str
+    health_goal: str
+    dietary_preference: str
+    target_calories: float
+    target_macros: dict
+    weekly_plan: List[dict] = Field(..., description="List of 7 daily meal plans")
     created_at: str

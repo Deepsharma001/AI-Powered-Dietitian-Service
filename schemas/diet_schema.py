@@ -30,6 +30,7 @@ class PredictRequest(BaseModel):
     )
     use_csv: Optional[bool] = Field(False, examples=[False], description="If true, source meals from CSV fixtures instead of database")
     preference: Optional[str] = Field(None, examples=["vegetarian"], description="Explicit dietary preference: veg, vegetarian, vegan, keto, gluten_free, etc.")
+    weekly: Optional[bool] = Field(False, examples=[False], description="If true, generate 7-day weekly plan instead of single day plan")
 
 
 from typing import List, Optional

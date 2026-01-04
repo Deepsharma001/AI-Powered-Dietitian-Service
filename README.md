@@ -5,6 +5,7 @@ An intelligent FastAPI-based backend service that generates personalized diet an
 ## 📋 Table of Contents
 
 - [Features](#-features)
+- [Dataset](#-dataset)
 - [Tech Stack](#-tech-stack)
 - [Architecture](#-architecture)
 - [Setup Instructions](#-setup-instructions)
@@ -16,7 +17,7 @@ An intelligent FastAPI-based backend service that generates personalized diet an
 
 ## ✨ Features
 
-- **Personalized Meal Plans** - Generate daily meal plans tailored to user profiles
+- **Personalized Meal Plans** - Generate daily and weekly meal plans tailored to user profiles
 - **ML-Powered Predictions** - RandomForest classifier predicts optimal diet types
 - **Nutrition Calculation** - BMI, BMR, TDEE, and macro nutrient calculations
 - **Content-Based Recommendations** - TF-IDF and cosine similarity for meal suggestions
@@ -25,6 +26,21 @@ An intelligent FastAPI-based backend service that generates personalized diet an
 - **User Feedback System** - Collect ratings for collaborative filtering
 - **Comprehensive Error Handling** - Custom exceptions with standardized responses
 - **Repository Pattern** - Clean data access layer with CRUD operations
+
+## 📊 Dataset
+
+The service uses two datasets sourced from Kaggle:
+
+1. **Diet Recommendations Dataset** - Used for training the ML model
+   - Contains user profiles with age, gender, weight, height, activity level, and recommended diet types
+   - Used to train the RandomForest classifier for diet prediction
+   
+2. **Healthy Meal Plans Dataset** - Meal database with nutritional information
+   - Contains 500+ meals with complete nutritional profiles
+   - Includes meal types (breakfast, lunch, dinner, snack), calories, macros, and dietary tags
+   - Located at: `data/fixtures/healthy_meal_plans.csv`
+
+**Source**: [Kaggle Datasets](https://www.kaggle.com/)
 
 ## 🛠 Tech Stack
 
@@ -390,14 +406,11 @@ MEAL_CSV_PATH=data/fixtures/healthy_meal_plans.csv
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## �‍💻 Author
 
-This project is licensed under the MIT License.
-
-## 👨‍💻 Author
+**Deepak Sharma**  
+Email: sharmadeep5212@gmail.com
 
 Developed as an AI-powered nutrition and diet recommendation system.
 
 ---
-
-**Note:** This service is for educational and informational purposes. Always consult healthcare professionals for personalized medical or dietary advice.
