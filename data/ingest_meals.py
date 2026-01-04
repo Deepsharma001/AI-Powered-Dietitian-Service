@@ -33,6 +33,32 @@ KNOWN_TAGS = {
 }
 
 
+def denormalize_nutrition(normalized_value: float, nutrient_type: str) -> float:
+    """Convert normalized 0-1 values to real nutritional units.
+    
+    Args:
+        normalized_value: Normalized value between 0 and 1.
+        nutrient_type: Type of nutrient ('calories', 'protein', 'carbs', 'fat').
+        
+    Returns:
+        Real-world value in appropriate units (kcal or grams).
+    """
+    # Define realistic ranges for each nutrient per meal
+    ranges = {
+        'calories': (50, 800),    # kcal per meal
+        'protein': (0, 60),       # grams
+        'carbs': (0, 100),        # grams
+        'fat': (0, 40)            # grams
+    }
+    
+    min_val, max_val = ranges.get(nutrient_type, (0, 100))
+    # Check if value appears to be already denormalized (> 1.5)
+    if normalized_value > 1.5:
+        return normalized_value
+    
+    return min_val + (normalized_value * (max_val - min_val))
+
+
 def infer_meal_type(name: str) -> str:
     """Heuristic to assign a meal_type from the meal name.
     
@@ -106,15 +132,31 @@ def parse_meals_csv(csv_path: str) -> List[Dict]:
         protein = row.get("protein")
         carbs = row.get("carbs")
         fat = row.get("fat")
+        
+        # Parse and denormalize nutrition values
         try:
-            calories = float(calories) if not (calories is None or str(calories).strip() == "") else 0.0
+            calories_raw = float(calories) if not (calories is None or str(calories).strip() == "") else 0.0
+            calories = denormalize_nutrition(calories_raw, 'calories')
         except Exception:
             calories = 0.0
-        for k in ("protein", "carbs", "fat"):
-            try:
-                locals()[k] = float(row.get(k)) if not (row.get(k) is None or str(row.get(k)).strip() == "") else 0.0
-            except Exception:
-                locals()[k] = 0.0
+        
+        try:
+            protein_raw = float(row.get("protein")) if not (row.get("protein") is None or str(row.get("protein")).strip() == "") else 0.0
+            protein = denormalize_nutrition(protein_raw, 'protein')
+        except Exception:
+            protein = 0.0
+            
+        try:
+            carbs_raw = float(row.get("carbs")) if not (row.get("carbs") is None or str(row.get("carbs")).strip() == "") else 0.0
+            carbs = denormalize_nutrition(carbs_raw, 'carbs')
+        except Exception:
+            carbs = 0.0
+            
+        try:
+            fat_raw = float(row.get("fat")) if not (row.get("fat") is None or str(row.get("fat")).strip() == "") else 0.0
+            fat = denormalize_nutrition(fat_raw, 'fat')
+        except Exception:
+            fat = 0.0
 
         # Build tags
         tags = []
@@ -139,13 +181,20 @@ def parse_meals_csv(csv_path: str) -> List[Dict]:
             except Exception:
                 ingredients = [i.strip() for i in raw.split(",") if i.strip()]
 
+        # Recalculate calories from macros for consistency (4 kcal/g protein, 4 kcal/g carbs, 9 kcal/g fat)
+        calculated_calories = (protein * 4) + (carbs * 4) + (fat * 9)
+        # Use calculated calories if significantly different from stated
+        if abs(calculated_calories - calories) > calories * 0.15:
+            logger.debug(f"Adjusting calories for {name}: stated={calories:.1f}, calculated={calculated_calories:.1f}")
+            calories = calculated_calories
+        
         meals.append({
             "name": name,
             "meal_type": meal_type,
-            "calories": round(calories, 2),
-            "protein": round(float(row.get("protein") or protein or 0.0), 2),
-            "carbs": round(float(row.get("carbs") or carbs or 0.0), 2),
-            "fat": round(float(row.get("fat") or fat or 0.0), 2),
+            "calories": round(calories, 1),
+            "protein": round(protein, 1),
+            "carbs": round(carbs, 1),
+            "fat": round(fat, 1),
             "dietary_tags": tags,
             "ingredients": ingredients,
         })

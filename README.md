@@ -169,7 +169,7 @@ The service follows a layered architecture with clear separation of concerns:
 ### Example Request
 
 ```bash
-# Create user with meal plan
+# Create user with meal plan (balanced diet, maintenance goal)
 curl -X POST "http://localhost:8000/api/create-user-with-plan" \
   -H "Content-Type: application/json" \
   -d '{
@@ -183,6 +183,35 @@ curl -X POST "http://localhost:8000/api/create-user-with-plan" \
     "health_goal": "maintain"
   }'
 
+# Create user with weight loss goal and vegetarian preference
+curl -X POST "http://localhost:8000/api/create-user-with-plan" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Jane Smith",
+    "age": 28,
+    "height": 165,
+    "weight": 70,
+    "gender": "female",
+    "activity_level": "lightly_active",
+    "dietary_preference": "vegetarian",
+    "health_goal": "weight_loss",
+    "use_csv": true
+  }'
+
+# Create user with muscle gain goal
+curl -X POST "http://localhost:8000/api/create-user-with-plan" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Mike Johnson",
+    "age": 25,
+    "height": 180,
+    "weight": 85,
+    "gender": "male",
+    "activity_level": "very_active",
+    "dietary_preference": "high-protein",
+    "health_goal": "muscle_gain"
+  }'
+
 # Predict diet with CSV meals
 curl -X POST "http://localhost:8000/api/diet/predict" \
   -H "Content-Type: application/json" \
@@ -192,6 +221,29 @@ curl -X POST "http://localhost:8000/api/diet/predict" \
     "preference": "veg"
   }'
 ```
+
+### Available Options
+
+**Health Goals:**
+- `weight_loss` - Reduces daily calories by 500 (minimum 1200)
+- `muscle_gain` - Increases daily calories by 300
+- `maintain` - Maintains current TDEE
+
+**Dietary Preferences:**
+- `balanced` - Standard 30/40/30 (protein/carbs/fat) ratio
+- `keto` - Low-carb, high-fat diet
+- `vegetarian` - Excludes meat
+- `vegan` - Excludes all animal products
+- `paleo` - Whole foods, no processed items
+- `mediterranean` - Heart-healthy Mediterranean diet
+- `high-protein` - 40% protein, 30/30 carbs/fat
+
+**Activity Levels:**
+- `sedentary` - Little to no exercise
+- `lightly_active` - Exercise 1-3 days/week
+- `moderately_active` - Exercise 3-5 days/week
+- `very_active` - Exercise 6-7 days/week
+- `extremely_active` - Very intense daily exercise
 
 ## 📁 Project Structure
 

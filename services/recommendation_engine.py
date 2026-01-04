@@ -171,32 +171,51 @@ class RecommendationEngine:
         logger.debug("Filtered meals: %s -> %s", len(all_meals), len(out))
         return out
 
-    def score_meal(self, meal, target_calories_per_meal: float, target_macros_per_meal: Dict[str, float]) -> float:
+    def score_meal(self, meal, target_calories_per_meal: float, target_macros_per_meal: Dict[str, float], dietary_preference: str = 'balanced') -> float:
         """Compute a heuristic score for how well a meal matches targets.
 
         Score blends calories proximity and macro proximity penalty.
+        For high-protein diets, protein matching is weighted more heavily.
         
         Args:
             meal: Meal object to score.
             target_calories_per_meal: Target calories for this meal slot.
             target_macros_per_meal: Target macros dict (protein, carbs, fat).
+            dietary_preference: User's dietary preference for weighted scoring.
             
         Returns:
             Float score where higher values indicate better matches.
         """
         cal_diff = abs(meal.calories - target_calories_per_meal)
-        cal_score = max(0, 50 - (cal_diff / max(1, target_calories_per_meal)) * 50)
-        p_diff = abs(meal.protein - target_macros_per_meal['protein'])
-        c_diff = abs(meal.carbs - target_macros_per_meal['carbs'])
+        cal_score = max(0, 30 - (cal_diff / max(1, target_calories_per_meal)) * 30)
+        
+        # Weight protein HEAVILY for high-protein diets (3x)
+        # Also penalize carbs more for high-protein diets
+        if dietary_preference == 'high-protein':
+            protein_weight = 3.0
+            carb_weight = 0.5  # Less penalty for being off on carbs
+            # Bonus for high protein percentage
+            protein_pct = (meal.protein * 4) / max(1, meal.calories)
+            protein_bonus = 20 if protein_pct >= 0.35 else (10 if protein_pct >= 0.30 else 0)
+        else:
+            protein_weight = 1.0
+            carb_weight = 1.0
+            protein_bonus = 0
+        
+        p_diff = abs(meal.protein - target_macros_per_meal['protein']) * protein_weight
+        c_diff = abs(meal.carbs - target_macros_per_meal['carbs']) * carb_weight
         f_diff = abs(meal.fat - target_macros_per_meal['fat'])
-        denom = (target_macros_per_meal['protein'] + target_macros_per_meal['carbs'] + max(1, target_macros_per_meal['fat']))
+        
+        denom = (target_macros_per_meal['protein'] * protein_weight + target_macros_per_meal['carbs'] * carb_weight + max(1, target_macros_per_meal['fat']))
         macro_penalty = (p_diff + c_diff + f_diff) / denom
-        macro_score = max(0, 40 - macro_penalty * 40)
+        macro_score = max(0, 50 - macro_penalty * 50) + protein_bonus
+        
         score = cal_score + macro_score + random.random()
-        logger.debug("Score meal %s: %s", getattr(meal, 'name', None), score)
+        logger.debug("Score meal %s: %.1f (cal=%.1f, macro=%.1f, bonus=%.1f)", 
+                    getattr(meal, 'name', None), score, cal_score, macro_score, protein_bonus)
         return score
 
-    def select_best_meal(self, meals_pool: List, meal_type: str, target_calories: float, target_macros: Dict[str, float]):
+    def select_best_meal(self, meals_pool: List, meal_type: str, target_calories: float, target_macros: Dict[str, float], dietary_preference: str = 'balanced'):
         """Select the highest-scoring meal matching a given meal_type.
         
         Args:
@@ -204,6 +223,7 @@ class RecommendationEngine:
             meal_type: Required meal type ('breakfast', 'lunch', 'dinner', 'snack').
             target_calories: Target calories for this meal slot.
             target_macros: Target macros dict.
+            dietary_preference: User's dietary preference for weighted scoring.
 
         Returns:
             Best matching Meal object or None if no candidates found.
@@ -212,7 +232,7 @@ class RecommendationEngine:
         if not candidates:
             logger.warning("No candidates for meal_type %s", meal_type)
             return None
-        best = max(candidates, key=lambda m: self.score_meal(m, target_calories, target_macros))
+        best = max(candidates, key=lambda m: self.score_meal(m, target_calories, target_macros, dietary_preference))
         logger.debug("Selected best meal for %s: %s", meal_type, best.name)
         return best
 
@@ -245,7 +265,7 @@ class RecommendationEngine:
         for mtype in ['breakfast', 'lunch', 'dinner', 'snack']:
             target_c = target_calories * per[mtype]
             target_mac = {k: total_macros[k] * per[mtype] for k in total_macros}
-            sel = self.select_best_meal(pool, mtype, target_c, target_mac)
+            sel = self.select_best_meal(pool, mtype, target_c, target_mac, user_profile.dietary_preference)
             if sel is None:
                 candidates = [m for m in all_meals if getattr(m, 'meal_type', None) == mtype]
                 if not candidates:
@@ -255,27 +275,39 @@ class RecommendationEngine:
                 'id': getattr(sel, 'id', None),
                 'name': getattr(sel, 'name', None),
                 'meal_type': getattr(sel, 'meal_type', None),
-                'calories': getattr(sel, 'calories', 0),
-                'protein': getattr(sel, 'protein', 0),
-                'carbs': getattr(sel, 'carbs', 0),
-                'fat': getattr(sel, 'fat', 0),
-                'ingredients': json.loads(sel.ingredients) if hasattr(sel, 'ingredients') and sel.ingredients else []
+                'calories': round(getattr(sel, 'calories', 0), 1),
+                'protein': round(getattr(sel, 'protein', 0), 1),
+                'carbs': round(getattr(sel, 'carbs', 0), 1),
+                'fat': round(getattr(sel, 'fat', 0), 1),
+                'ingredients': sel.ingredients if isinstance(getattr(sel, 'ingredients', []), list) else (json.loads(sel.ingredients) if hasattr(sel, 'ingredients') and sel.ingredients else [])
             }
             daily_totals['calories'] += getattr(sel, 'calories', 0)
             daily_totals['protein'] += getattr(sel, 'protein', 0)
             daily_totals['carbs'] += getattr(sel, 'carbs', 0)
             daily_totals['fat'] += getattr(sel, 'fat', 0)
 
-        plan['daily_totals'] = daily_totals
+        # Round totals to eliminate floating point noise
+        plan['daily_totals'] = {
+            'calories': round(daily_totals['calories'], 1),
+            'protein': round(daily_totals['protein'], 1),
+            'carbs': round(daily_totals['carbs'], 1),
+            'fat': round(daily_totals['fat'], 1)
+        }
         plan['date'] = __import__('datetime').date.today().isoformat()
-        logger.info("Generated plan for user %s: calories=%s", getattr(user_profile, 'id', None), daily_totals['calories'])
+        logger.info("Generated plan for user %s: calories=%.1f, protein=%.1fg (target=%.1fg)", 
+                   getattr(user_profile, 'id', None), daily_totals['calories'], 
+                   daily_totals['protein'], user_profile.target_protein)
         return plan
 
     def generate_weekly_meal_plan(self, user_profile, all_meals) -> List[Dict]:
         """Generate a 7-day weekly meal plan with variety.
 
         Ensures meal variety by tracking used meals and avoiding repetition
-        across the week.
+        across the week. Uses meal name for tracking to support both CSV
+        and database sources.
+
+        Note: Current algorithm provides basic variety but can be improved
+        in future iterations with more sophisticated rotation logic.
 
         Args:
             user_profile: ORM User object containing target calories/macros.
@@ -298,6 +330,7 @@ class RecommendationEngine:
         pool = self.filter_meals_by_preference(all_meals, user_profile.dietary_preference, allergies)
 
         weekly_plan = []
+        # Track by meal name to support CSV sources (which don't have IDs)
         used_meals = {'breakfast': set(), 'lunch': set(), 'dinner': set(), 'snack': set()}
         
         start_date = date.today()
@@ -311,11 +344,12 @@ class RecommendationEngine:
                 target_c = target_calories * per[mtype]
                 target_mac = {k: total_macros[k] * per[mtype] for k in total_macros}
                 
-                # Filter out already used meals for variety
-                available = [m for m in pool if m.meal_type == mtype and getattr(m, 'id', None) not in used_meals[mtype]]
+                # Filter out already used meals for variety (track by name)
+                available = [m for m in pool if m.meal_type == mtype and getattr(m, 'name', None) not in used_meals[mtype]]
                 
                 if not available:
                     # If all meals used, reset for this meal type
+                    logger.debug(f"Resetting used meals for {mtype} on day {day_offset + 1}")
                     used_meals[mtype].clear()
                     available = [m for m in pool if m.meal_type == mtype]
                 
@@ -326,32 +360,46 @@ class RecommendationEngine:
                 if not available:
                     continue
                 
-                # Score and select best meal
-                scored = [(self.score_meal(m, target_c, target_mac), m) for m in available]
+                # Score and select best meal with variety penalty
+                scored = []
+                for m in available:
+                    score = self.score_meal(m, target_c, target_mac, user_profile.dietary_preference)
+                    # Apply small variety bonus to encourage different meals
+                    meal_name = getattr(m, 'name', None)
+                    if meal_name and meal_name not in used_meals[mtype]:
+                        score += 0.5  # Small bonus for new meals
+                    scored.append((score, m))
+                
                 scored.sort(key=lambda x: x[0], reverse=True)
                 sel = scored[0][1]
                 
-                # Mark as used
-                meal_id = getattr(sel, 'id', None)
-                if meal_id:
-                    used_meals[mtype].add(meal_id)
+                # Mark as used by name
+                meal_name = getattr(sel, 'name', None)
+                if meal_name:
+                    used_meals[mtype].add(meal_name)
                 
                 day_plan[mtype] = {
-                    'id': meal_id,
-                    'name': getattr(sel, 'name', None),
+                    'id': getattr(sel, 'id', None),
+                    'name': meal_name,
                     'meal_type': getattr(sel, 'meal_type', None),
-                    'calories': getattr(sel, 'calories', 0),
-                    'protein': getattr(sel, 'protein', 0),
-                    'carbs': getattr(sel, 'carbs', 0),
-                    'fat': getattr(sel, 'fat', 0),
-                    'ingredients': json.loads(sel.ingredients) if hasattr(sel, 'ingredients') and sel.ingredients else []
+                    'calories': round(getattr(sel, 'calories', 0), 1),
+                    'protein': round(getattr(sel, 'protein', 0), 1),
+                    'carbs': round(getattr(sel, 'carbs', 0), 1),
+                    'fat': round(getattr(sel, 'fat', 0), 1),
+                    'ingredients': sel.ingredients if isinstance(getattr(sel, 'ingredients', []), list) else (json.loads(sel.ingredients) if hasattr(sel, 'ingredients') and sel.ingredients else [])
                 }
                 daily_totals['calories'] += getattr(sel, 'calories', 0)
                 daily_totals['protein'] += getattr(sel, 'protein', 0)
                 daily_totals['carbs'] += getattr(sel, 'carbs', 0)
                 daily_totals['fat'] += getattr(sel, 'fat', 0)
             
-            day_plan['daily_totals'] = daily_totals
+            # Round totals to eliminate floating point noise
+            day_plan['daily_totals'] = {
+                'calories': round(daily_totals['calories'], 1),
+                'protein': round(daily_totals['protein'], 1),
+                'carbs': round(daily_totals['carbs'], 1),
+                'fat': round(daily_totals['fat'], 1)
+            }
             day_plan['date'] = plan_date.isoformat()
             day_plan['day_of_week'] = plan_date.strftime('%A')
             weekly_plan.append(day_plan)
