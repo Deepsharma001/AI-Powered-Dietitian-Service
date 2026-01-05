@@ -1,8 +1,8 @@
-# 🥗 AI-Powered Dietitian Service
+# AI-Powered Dietitian Service
 
 An intelligent FastAPI-based backend service that generates personalized diet and meal recommendations using machine learning, nutrition science, and content-based filtering.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Features](#-features)
 - [Dataset](#-dataset)
@@ -15,7 +15,7 @@ An intelligent FastAPI-based backend service that generates personalized diet an
 - [Testing](#-testing)
 - [Documentation](#-documentation)
 
-## ✨ Features
+## Features
 
 - **Personalized Meal Plans** - Generate daily and weekly meal plans tailored to user profiles
 - **ML-Powered Predictions** - RandomForest classifier predicts optimal diet types
@@ -27,7 +27,7 @@ An intelligent FastAPI-based backend service that generates personalized diet an
 - **Comprehensive Error Handling** - Custom exceptions with standardized responses
 - **Repository Pattern** - Clean data access layer with CRUD operations
 
-## 📊 Dataset
+## Dataset
 
 The service uses two datasets sourced from Kaggle:
 
@@ -42,7 +42,7 @@ The service uses two datasets sourced from Kaggle:
 
 **Source**: [Kaggle Datasets](https://www.kaggle.com/)
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Core Framework
 - **FastAPI** - Modern async web framework
@@ -60,7 +60,7 @@ The service uses two datasets sourced from Kaggle:
 - **uvicorn** - ASGI server
 - **python-dotenv** - Environment configuration
 
-## 🏗 Architecture
+## Architecture
 
 The service follows a layered architecture with clear separation of concerns:
 
@@ -88,7 +88,7 @@ The service follows a layered architecture with clear separation of concerns:
 └──────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Setup Instructions
+## Setup Instructions
 
 ### Prerequisites
 
@@ -146,7 +146,7 @@ The service follows a layered architecture with clear separation of concerns:
    - Interactive Docs: `http://localhost:8000/docs`
    - Health Check: `http://localhost:8000/health`
 
-## 📡 API Endpoints
+## API Endpoints
 
 ### Health & Status
 - `GET /health` - Health check and database connectivity
@@ -245,7 +245,7 @@ curl -X POST "http://localhost:8000/api/diet/predict" \
 - `very_active` - Exercise 6-7 days/week
 - `extremely_active` - Very intense daily exercise
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 AI-Powered-Dietitian-Service/
@@ -295,7 +295,7 @@ AI-Powered-Dietitian-Service/
 └── README.md                     # This file
 ```
 
-## 🧠 Approach & Methodology
+## Approach & Methodology
 
 ### 1. Nutrition Science Foundation
 
@@ -377,7 +377,7 @@ The service uses established nutrition formulas:
 - **Comprehensive docstrings** for all functions
 - **OpenAPI/Swagger** documentation auto-generated
 
-## 🧪 Testing
+## Testing
 
 Run the test suite:
 
@@ -401,14 +401,14 @@ pytest tests/ --cov=. --cov-report=html
 
 **Current Status:** 12/12 tests passing ✅
 
-## 📚 Documentation
+## Documentation
 
 - **[ERROR_HANDLING.md](ERROR_HANDLING.md)** - Comprehensive error handling guide
 - **[ERROR_HANDLING_FLOW.md](ERROR_HANDLING_FLOW.md)** - Visual error flow diagram
 - **[API_EXAMPLES.md](API_EXAMPLES.md)** - API usage examples
 - **Interactive API Docs** - Available at `/docs` when server is running
 
-## 🎯 Key Features Explained
+## Key Features Explained
 
 ### Flexible Meal Sourcing
 
@@ -439,7 +439,7 @@ Supported preferences: `vegetarian`, `vegan`, `keto`, `paleo`, `mediterranean`, 
 }
 ```
 
-## 🔧 Configuration
+## Configuration
 
 Environment variables (create `.env` file):
 
@@ -450,7 +450,7 @@ MODEL_PATH=data/models/diet_model.joblib
 MEAL_CSV_PATH=data/fixtures/healthy_meal_plans.csv
 ```
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -458,7 +458,7 @@ MEAL_CSV_PATH=data/fixtures/healthy_meal_plans.csv
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## �‍💻 Author
+## Author
 
 **Deepak Sharma**  
 Email: sharmadeep5212@gmail.com
